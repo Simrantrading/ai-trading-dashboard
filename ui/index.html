@@ -576,26 +576,59 @@
       } catch(e) {}
     }
 
+    async function fetchWithRetry(url, retries = 3) {
+      const status = document.getElementById("statusText");
+      for (let i = 0; i < retries; i++) {
+        try {
+          if (i === 0) status.textContent = "Waking server… (free tier may take 60s)";
+          else status.textContent = `Retrying… (${i + 1}/${retries})`;
+
+          const controller = new AbortController();
+          const timer = setTimeout(() => controller.abort(), 120000);
+          const res = await fetch(url, { signal: controller.signal });
+          clearTimeout(timer);
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          return await res.json();
+        } catch (err) {
+          if (i === retries - 1) throw err;
+          await new Promise(r => setTimeout(r, 8000));
+        }
+      }
+    }
+
+    async function wakeServer() {
+      try {
+        await fetch("/api/ping", { signal: AbortSignal.timeout(120000) });
+      } catch (e) {
+        try { await fetch("/api/health", { signal: AbortSignal.timeout(120000) }); } catch (_) {}
+      }
+    }
+
     async function runScan() {
       const btn = document.getElementById("scanBtn");
       const area = document.getElementById("resultsArea");
       const status = document.getElementById("statusText");
       btn.disabled = true;
-      area.innerHTML = '<div class="loading">Scanning…</div>';
-      status.textContent = "Scanning…";
+      area.innerHTML = '<div class="loading">Waking server… first scan may take up to 60 seconds on free hosting.</div>';
+      status.textContent = "Connecting…";
 
       try {
+        await wakeServer();
+        status.textContent = "Scanning market…";
+        area.innerHTML = '<div class="loading">Scanning market…</div>';
+
         const mc = document.getElementById("minChange").value;
         const mv = document.getElementById("minVol").value;
         const lim = document.getElementById("limit").value;
-        const res = await fetch(`/api/rockets?min_change=${mc}&min_volume_ratio=${mv}&limit=${lim}`);
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const data = await res.json();
+        const data = await fetchWithRetry(`/api/rockets?min_change=${mc}&min_volume_ratio=${mv}&limit=${lim}`);
         area.innerHTML = renderTable(data.rockets);
         status.textContent = `${SESSION_LABELS[data.session]||data.session}: ${data.count} rockets · ${new Date().toLocaleTimeString()}`;
       } catch(err) {
-        area.innerHTML = `<div class="error">Scan failed: ${err.message}</div>`;
-        status.textContent = "Error";
+        const msg = err.name === "AbortError"
+          ? "Timed out — tap Scan Now to retry. Server may be waking up."
+          : err.message;
+        area.innerHTML = `<div class="error">Scan failed: ${msg}</div>`;
+        status.textContent = "Error — tap Scan Now to retry";
       } finally {
         btn.disabled = false;
       }

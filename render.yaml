@@ -7,6 +7,8 @@ services:
     envVars:
       - key: PORT
         value: 8000
+      - key: RENDER
+        value: true
       - key: TELEGRAM_BOT_TOKEN
         sync: false
       - key: TELEGRAM_CHAT_ID

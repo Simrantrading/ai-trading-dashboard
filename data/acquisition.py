@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import os
 from functools import lru_cache
 
 import pandas as pd
@@ -10,18 +11,20 @@ import yfinance as yf
 
 logger = logging.getLogger(__name__)
 
-# Fallback watchlist when Wikipedia / network is unavailable
+# Core watchlist — high-volume tickers for day trading
 DEFAULT_WATCHLIST = [
     "AAPL", "MSFT", "GOOGL", "AMZN", "NVDA", "META", "TSLA", "AMD", "NFLX",
-    "CRM", "AVGO", "ORCL", "ADBE", "INTC", "QCOM", "TXN", "AMAT", "MU", "LRCX",
-    "COIN", "MARA", "RIOT", "PLTR", "SOFI", "HOOD", "RIVN", "LCID", "NIO", "XPEV",
-    "SMCI", "ARM", "IONQ", "RKLB", "GME", "AMC", "BBBY", "MSTR", "PYPL",
-    "UBER", "LYFT", "ABNB", "SNAP", "PINS", "ROKU", "SHOP", "CRWD", "NET", "DDOG",
-    "SNOW", "ZS", "PANW", "FTNT", "DKNG", "PENN", "WYNN", "MGM", "LVS", "CCL",
-    "RCL", "DAL", "UAL", "AAL", "BA", "LMT", "RTX", "GE", "CAT", "DE",
-    "JPM", "BAC", "GS", "MS", "WFC", "C", "V", "MA", "AXP", "BLK",
-    "XOM", "CVX", "COP", "SLB", "OXY", "EOG", "MPC", "VLO", "PSX", "HAL",
-    "LLY", "UNH", "JNJ", "PFE", "MRK", "ABBV", "BMY", "AMGN", "GILD", "REGN",
+    "CRM", "AVGO", "ORCL", "ADBE", "INTC", "QCOM", "COIN", "MARA", "PLTR",
+    "SOFI", "HOOD", "SMCI", "ARM", "GME", "MSTR", "PYPL", "UBER", "SNAP",
+    "ROKU", "SHOP", "CRWD", "NET", "SNOW", "PANW", "DKNG", "RIVN", "NIO",
+]
+
+# Full list for local / powerful servers
+FULL_WATCHLIST = DEFAULT_WATCHLIST + [
+    "TXN", "AMAT", "MU", "LRCX", "RIOT", "IONQ", "RKLB", "AMC", "BBBY",
+    "LYFT", "ABNB", "PINS", "DDOG", "ZS", "FTNT", "PENN", "WYNN", "MGM",
+    "LVS", "CCL", "RCL", "DAL", "UAL", "AAL", "BA", "LMT", "RTX", "GE",
+    "JPM", "BAC", "GS", "XOM", "CVX", "LLY", "UNH", "JNJ", "PFE",
 ]
 
 
@@ -43,8 +46,11 @@ def get_sp500_symbols() -> list[str]:
 
 
 def get_scan_universe() -> list[str]:
-    """Trading universe — default watchlist for faster intraday scans."""
-    return DEFAULT_WATCHLIST.copy()
+    """Trading universe — smaller list on cloud for faster scans."""
+    if os.getenv("RENDER") or os.getenv("CLOUD_MODE", "").lower() == "true":
+        logger.info("Cloud mode: using %d tickers", len(DEFAULT_WATCHLIST))
+        return DEFAULT_WATCHLIST.copy()
+    return FULL_WATCHLIST.copy()
 
 
 def fetch_market_data(

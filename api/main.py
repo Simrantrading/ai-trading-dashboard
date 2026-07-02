@@ -52,6 +52,12 @@ async def root():
 
 @app.get("/api/health")
 async def health():
+    return {"status": "ok", "ready": True}
+
+
+@app.get("/api/ping")
+async def ping():
+    """Instant response — use to wake free-tier server before scanning."""
     return {"status": "ok"}
 
 
@@ -60,16 +66,17 @@ async def wake():
     """
     Lightweight endpoint for external cron (free-tier hosting).
     Wakes the server, runs a scan, and fires alerts to Telegram/Discord.
-  """
+    """
     session = get_market_session().value
     cfg = get_session_config(session)
-    rockets = scan_rockets(
+    rockets = await asyncio.to_thread(
+        scan_rockets,
         min_pct_change=cfg.min_pct_change,
         min_volume_ratio=cfg.min_volume_ratio,
         limit=cfg.limit,
         session=session,
     )
-    new_alerts = process_scan_results(rockets, session)
+    new_alerts = await asyncio.to_thread(process_scan_results, rockets, session)
     return {
         "status": "ok",
         "session": session,
@@ -103,7 +110,8 @@ async def get_rockets(
     active = session or get_market_session().value
     cfg = get_session_config(active)
 
-    rockets = scan_rockets(
+    rockets = await asyncio.to_thread(
+        scan_rockets,
         min_pct_change=min_change if min_change is not None else cfg.min_pct_change,
         min_volume_ratio=min_volume_ratio if min_volume_ratio is not None else cfg.min_volume_ratio,
         limit=limit,
@@ -137,13 +145,14 @@ async def trigger_scan():
     """Manually trigger a scan and fire alerts."""
     session = get_market_session().value
     cfg = get_session_config(session)
-    rockets = scan_rockets(
+    rockets = await asyncio.to_thread(
+        scan_rockets,
         min_pct_change=cfg.min_pct_change,
         min_volume_ratio=cfg.min_volume_ratio,
         limit=cfg.limit,
         session=session,
     )
-    new_alerts = process_scan_results(rockets, session)
+    new_alerts = await asyncio.to_thread(process_scan_results, rockets, session)
     return {
         "session": session,
         "rockets_found": len(rockets),

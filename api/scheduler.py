@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import logging
 
+from datetime import datetime, timedelta
+
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.interval import IntervalTrigger
 
@@ -92,11 +94,12 @@ def start_scheduler() -> BackgroundScheduler:
         replace_existing=True,
     )
 
-    # Run immediately on startup
+    # Defer first scan so the server responds to UI requests immediately
     _scheduler.add_job(
         _run_scheduled_scan,
         id="startup_scan",
         replace_existing=True,
+        next_run_time=datetime.now() + timedelta(seconds=60),
     )
 
     _scheduler.start()
