@@ -6,15 +6,17 @@
   <title>Market Rocket Scanner</title>
   <style>
     :root {
-      --bg: #0f1419;
-      --card: #1a2332;
-      --border: #2d3a4f;
+      --bg: #0a0e14;
+      --card: #141b26;
+      --border: #243044;
       --text: #e7ecf3;
-      --muted: #8b9cb3;
+      --muted: #7d8da6;
       --accent: #3b82f6;
       --green: #22c55e;
       --red: #ef4444;
       --orange: #f97316;
+      --yellow: #eab308;
+      --purple: #a855f7;
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -24,59 +26,137 @@
       background: var(--bg);
       color: var(--text);
       min-height: 100vh;
-      padding: 24px 16px 48px;
+      padding: 20px 14px 48px;
     }
 
-    .container { max-width: 1100px; margin: 0 auto; }
+    .container { max-width: 1200px; margin: 0 auto; }
 
-    header { margin-bottom: 28px; }
-
-    h1 {
-      font-size: 1.75rem;
-      font-weight: 700;
+    header {
       display: flex;
-      align-items: center;
-      gap: 10px;
+      justify-content: space-between;
+      align-items: flex-start;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-bottom: 20px;
     }
 
-    .subtitle { color: var(--muted); margin-top: 6px; font-size: 0.95rem; }
+    h1 { font-size: 1.6rem; font-weight: 700; }
+    .subtitle { color: var(--muted); margin-top: 4px; font-size: 0.9rem; }
+
+    .session-pill {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 4px;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 4px 10px;
+      border-radius: 999px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .badge.premarket { background: rgba(168,85,247,0.2); color: var(--purple); }
+    .badge.intraday { background: rgba(34,197,94,0.15); color: var(--green); }
+    .badge.postmarket { background: rgba(249,115,22,0.15); color: var(--orange); }
+    .badge.closed { background: rgba(125,141,166,0.15); color: var(--muted); }
+
+    .session-time { font-size: 0.8rem; color: var(--muted); }
+
+    .tabs {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+
+    .tab {
+      background: var(--card);
+      border: 1px solid var(--border);
+      color: var(--muted);
+      padding: 8px 16px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 0.9rem;
+    }
+
+    .tab.active {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: white;
+    }
+
+    .panel { display: none; }
+    .panel.active { display: block; }
+
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 380px;
+      gap: 16px;
+    }
+
+    @media (max-width: 900px) {
+      .grid-2 { grid-template-columns: 1fr; }
+    }
+
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+    }
+
+    .card-header {
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-weight: 600;
+      font-size: 0.95rem;
+    }
 
     .controls {
       display: flex;
       flex-wrap: wrap;
-      gap: 12px;
+      gap: 10px;
       align-items: end;
-      background: var(--card);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 16px;
-      margin-bottom: 20px;
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--border);
     }
 
     .field { display: flex; flex-direction: column; gap: 4px; }
-
-    label { font-size: 0.8rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+    label { font-size: 0.72rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
 
     input, select {
       background: var(--bg);
       border: 1px solid var(--border);
       color: var(--text);
-      padding: 8px 12px;
-      border-radius: 8px;
-      font-size: 0.95rem;
-      width: 140px;
+      padding: 7px 10px;
+      border-radius: 7px;
+      font-size: 0.9rem;
+      width: 120px;
     }
 
     button {
       background: var(--accent);
       color: white;
       border: none;
-      padding: 10px 20px;
+      padding: 9px 16px;
       border-radius: 8px;
-      font-size: 0.95rem;
+      font-size: 0.9rem;
       font-weight: 600;
       cursor: pointer;
-      transition: opacity 0.15s;
+    }
+
+    button.secondary {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text);
     }
 
     button:hover { opacity: 0.9; }
@@ -85,223 +165,457 @@
     .status-bar {
       display: flex;
       justify-content: space-between;
-      align-items: center;
-      margin-bottom: 12px;
-      font-size: 0.85rem;
+      padding: 8px 16px;
+      font-size: 0.8rem;
       color: var(--muted);
-    }
-
-    .badge {
-      display: inline-block;
-      padding: 2px 8px;
-      border-radius: 999px;
-      font-size: 0.75rem;
-      font-weight: 600;
-    }
-
-    .badge.live { background: rgba(34, 197, 94, 0.15); color: var(--green); }
-
-    .table-wrap {
-      background: var(--card);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      overflow: hidden;
+      border-bottom: 1px solid var(--border);
     }
 
     table { width: 100%; border-collapse: collapse; }
 
     th {
       text-align: left;
-      padding: 12px 14px;
-      font-size: 0.75rem;
+      padding: 10px 12px;
+      font-size: 0.7rem;
       text-transform: uppercase;
       letter-spacing: 0.05em;
       color: var(--muted);
       border-bottom: 1px solid var(--border);
-      background: rgba(0,0,0,0.2);
+      background: rgba(0,0,0,0.25);
     }
 
     td {
-      padding: 12px 14px;
+      padding: 10px 12px;
       border-bottom: 1px solid var(--border);
-      font-size: 0.9rem;
+      font-size: 0.85rem;
     }
 
     tr:last-child td { border-bottom: none; }
-    tr:hover td { background: rgba(59, 130, 246, 0.05); }
+    tr:hover td { background: rgba(59,130,246,0.04); }
 
     .symbol { font-weight: 700; color: var(--accent); }
     .positive { color: var(--green); }
     .negative { color: var(--red); }
 
-    .score-bar {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-
+    .score-bar { display: flex; align-items: center; gap: 6px; }
     .score-track {
-      flex: 1;
-      height: 6px;
-      background: var(--border);
-      border-radius: 3px;
-      max-width: 80px;
-      overflow: hidden;
+      height: 5px; background: var(--border); border-radius: 3px;
+      width: 60px; overflow: hidden;
     }
-
     .score-fill {
-      height: 100%;
-      border-radius: 3px;
+      height: 100%; border-radius: 3px;
       background: linear-gradient(90deg, var(--accent), var(--orange));
     }
 
+    .alert-list { max-height: 600px; overflow-y: auto; }
+
+    .alert-item {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border);
+      animation: slideIn 0.3s ease;
+    }
+
+    @keyframes slideIn {
+      from { opacity: 0; transform: translateX(-8px); }
+      to { opacity: 1; transform: translateX(0); }
+    }
+
+    .alert-item.high { border-left: 3px solid var(--red); }
+    .alert-item.medium { border-left: 3px solid var(--orange); }
+    .alert-item.low { border-left: 3px solid var(--accent); }
+
+    .alert-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 4px;
+    }
+
+    .alert-symbol { font-weight: 700; font-size: 1rem; }
+    .alert-session {
+      font-size: 0.7rem;
+      padding: 2px 6px;
+      border-radius: 4px;
+      background: rgba(255,255,255,0.05);
+      color: var(--muted);
+      text-transform: uppercase;
+    }
+
+    .alert-msg { font-size: 0.85rem; color: var(--text); line-height: 1.4; }
+    .alert-time { font-size: 0.72rem; color: var(--muted); margin-top: 4px; }
+
     .empty, .error, .loading {
       text-align: center;
-      padding: 48px 20px;
+      padding: 40px 16px;
       color: var(--muted);
+      font-size: 0.9rem;
     }
 
     .error { color: var(--red); }
 
+    .settings-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 16px;
+      border-bottom: 1px solid var(--border);
+      font-size: 0.85rem;
+    }
+
+    .settings-row label { text-transform: none; letter-spacing: 0; font-size: 0.85rem; color: var(--text); }
+
+    .info-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 8px;
+      padding: 14px 16px;
+    }
+
+    .info-cell {
+      background: var(--bg);
+      border-radius: 8px;
+      padding: 10px;
+    }
+
+    .info-cell .label { font-size: 0.7rem; color: var(--muted); text-transform: uppercase; }
+    .info-cell .value { font-size: 1rem; font-weight: 600; margin-top: 2px; }
+
+    .hide-mobile { }
     @media (max-width: 700px) {
       .hide-mobile { display: none; }
       input, select { width: 100%; }
-      .controls { flex-direction: column; align-items: stretch; }
     }
   </style>
 </head>
 <body>
   <div class="container">
     <header>
-      <h1>🚀 Market Rocket Scanner</h1>
-      <p class="subtitle">Find stocks launching on volume, momentum, and trend strength</p>
+      <div>
+        <h1>🚀 Market Rocket Scanner</h1>
+        <p class="subtitle">Pre-market · Intraday · Post-market alerts for day trading</p>
+      </div>
+      <div class="session-pill">
+        <span class="badge intraday" id="sessionBadge">Loading…</span>
+        <span class="session-time" id="sessionTime"></span>
+      </div>
     </header>
 
-    <div class="controls">
-      <div class="field">
-        <label for="minChange">Min % Change</label>
-        <input type="number" id="minChange" value="0" step="0.5" min="-50" max="50">
-      </div>
-      <div class="field">
-        <label for="minVol">Min Vol Ratio</label>
-        <input type="number" id="minVol" value="1.0" step="0.1" min="0" max="20">
-      </div>
-      <div class="field">
-        <label for="limit">Limit</label>
-        <select id="limit">
-          <option value="10">10</option>
-          <option value="25" selected>25</option>
-          <option value="50">50</option>
-        </select>
-      </div>
-      <button id="scanBtn" onclick="runScan()">Scan Now</button>
+    <div class="tabs">
+      <button class="tab active" data-tab="scanner" onclick="switchTab('scanner')">Scanner</button>
+      <button class="tab" data-tab="alerts" onclick="switchTab('alerts')">
+        Alerts <span id="alertCount"></span>
+      </button>
+      <button class="tab" data-tab="settings" onclick="switchTab('settings')">Settings</button>
     </div>
 
-    <div class="status-bar">
-      <span id="statusText">Ready</span>
-      <span><span class="badge live" id="autoBadge">Auto-refresh: 60s</span></span>
+    <!-- SCANNER -->
+    <div class="panel active" id="panel-scanner">
+      <div class="grid-2">
+        <div class="card">
+          <div class="controls">
+            <div class="field">
+              <label>Min % Change</label>
+              <input type="number" id="minChange" value="0" step="0.5">
+            </div>
+            <div class="field">
+              <label>Min Vol Ratio</label>
+              <input type="number" id="minVol" value="1.0" step="0.1">
+            </div>
+            <div class="field">
+              <label>Limit</label>
+              <select id="limit">
+                <option value="10">10</option>
+                <option value="25" selected>25</option>
+                <option value="50">50</option>
+              </select>
+            </div>
+            <button id="scanBtn" onclick="runScan()">Scan Now</button>
+          </div>
+          <div class="status-bar">
+            <span id="statusText">Ready</span>
+            <span id="autoBadge">Auto-refresh: session-based</span>
+          </div>
+          <div id="resultsArea"><div class="loading">Loading scanner…</div></div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <span>🔔 Live Alerts</span>
+            <button class="secondary" style="padding:4px 10px;font-size:0.75rem" onclick="enableNotifications()">Enable Push</button>
+          </div>
+          <div class="alert-list" id="liveAlerts">
+            <div class="loading">Waiting for alerts…</div>
+          </div>
+        </div>
+      </div>
     </div>
 
-    <div class="table-wrap" id="resultsArea">
-      <div class="loading">Click "Scan Now" to find rocket stocks…</div>
+    <!-- ALERTS HISTORY -->
+    <div class="panel" id="panel-alerts">
+      <div class="card">
+        <div class="card-header">
+          <span>Alert History</span>
+          <button class="secondary" style="padding:4px 10px;font-size:0.75rem" onclick="loadAlerts()">Refresh</button>
+        </div>
+        <div class="alert-list" id="alertHistory">
+          <div class="loading">Loading alerts…</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SETTINGS -->
+    <div class="panel" id="panel-settings">
+      <div class="card">
+        <div class="card-header">Alert Settings</div>
+        <div class="settings-row">
+          <input type="checkbox" id="soundAlerts" checked>
+          <label for="soundAlerts">Play sound on new alerts</label>
+        </div>
+        <div class="settings-row">
+          <input type="checkbox" id="browserAlerts" checked>
+          <label for="browserAlerts">Browser push notifications</label>
+        </div>
+        <div class="info-grid" id="thresholdInfo">
+          <div class="info-cell"><div class="label">Session</div><div class="value" id="cfgSession">—</div></div>
+          <div class="info-cell"><div class="label">Scan Interval</div><div class="value" id="cfgInterval">—</div></div>
+          <div class="info-cell"><div class="label">Min % Change</div><div class="value" id="cfgMinChange">—</div></div>
+          <div class="info-cell"><div class="label">Min Vol Ratio</div><div class="value" id="cfgMinVol">—</div></div>
+          <div class="info-cell"><div class="label">Min Rocket Score</div><div class="value" id="cfgMinScore">—</div></div>
+          <div class="info-cell"><div class="label">Next Session</div><div class="value" id="cfgNext">—</div></div>
+        </div>
+        <div style="padding:14px 16px;font-size:0.82rem;color:var(--muted);line-height:1.5">
+          <strong style="color:var(--text)">Webhook alerts:</strong> Set <code>DISCORD_WEBHOOK_URL</code> or
+          <code>TELEGRAM_BOT_TOKEN</code> + <code>TELEGRAM_CHAT_ID</code> in your <code>.env</code> file
+          to receive alerts on your phone.
+        </div>
+      </div>
     </div>
   </div>
 
   <script>
     let refreshTimer = null;
+    let eventSource = null;
+    let knownAlertIds = new Set();
+    let unreadAlerts = 0;
+    let currentSession = "intraday";
+    let scanIntervalMs = 120000;
 
-    function pctClass(val) {
-      return val >= 0 ? "positive" : "negative";
+    const SESSION_LABELS = {
+      premarket: "Pre-Market",
+      intraday: "Intraday",
+      postmarket: "Post-Market",
+      closed: "Closed"
+    };
+
+    function switchTab(name) {
+      document.querySelectorAll(".tab").forEach(t => t.classList.toggle("active", t.dataset.tab === name));
+      document.querySelectorAll(".panel").forEach(p => p.classList.toggle("active", p.id === `panel-${name}`));
+      if (name === "alerts") { unreadAlerts = 0; updateAlertCount(); }
     }
 
-    function formatVolume(vol) {
-      if (vol >= 1e9) return (vol / 1e9).toFixed(1) + "B";
-      if (vol >= 1e6) return (vol / 1e6).toFixed(1) + "M";
-      if (vol >= 1e3) return (vol / 1e3).toFixed(1) + "K";
-      return vol.toFixed(0);
+    function updateAlertCount() {
+      const el = document.getElementById("alertCount");
+      el.textContent = unreadAlerts > 0 ? `(${unreadAlerts})` : "";
+    }
+
+    function pctClass(v) { return v >= 0 ? "positive" : "negative"; }
+
+    function formatVolume(v) {
+      if (v >= 1e9) return (v/1e9).toFixed(1)+"B";
+      if (v >= 1e6) return (v/1e6).toFixed(1)+"M";
+      if (v >= 1e3) return (v/1e3).toFixed(1)+"K";
+      return v.toFixed(0);
+    }
+
+    function formatTime(iso) {
+      return new Date(iso).toLocaleTimeString();
+    }
+
+    function renderAlertItem(a) {
+      return `
+        <div class="alert-item ${a.severity}">
+          <div class="alert-top">
+            <span class="alert-symbol">${a.symbol}</span>
+            <span class="alert-session">${SESSION_LABELS[a.session] || a.session}</span>
+          </div>
+          <div class="alert-msg">${a.message}</div>
+          <div class="alert-time">${formatTime(a.timestamp)} · ${a.alert_type.replace(/_/g," ")}</div>
+        </div>`;
+    }
+
+    function handleNewAlert(alert) {
+      if (knownAlertIds.has(alert.id)) return;
+      knownAlertIds.add(alert.id);
+
+      const live = document.getElementById("liveAlerts");
+      if (live.querySelector(".loading") || live.querySelector(".empty")) live.innerHTML = "";
+      live.insertAdjacentHTML("afterbegin", renderAlertItem(alert));
+
+      unreadAlerts++;
+      updateAlertCount();
+
+      if (document.getElementById("soundAlerts").checked) playAlertSound(alert.severity);
+      if (document.getElementById("browserAlerts").checked) showNotification(alert);
+    }
+
+    function playAlertSound(severity) {
+      try {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.frequency.value = severity === "high" ? 880 : 660;
+        gain.gain.value = 0.15;
+        osc.start();
+        osc.stop(ctx.currentTime + (severity === "high" ? 0.3 : 0.15));
+      } catch(e) {}
+    }
+
+    async function enableNotifications() {
+      if (!("Notification" in window)) { alert("Browser notifications not supported"); return; }
+      const perm = await Notification.requestPermission();
+      if (perm === "granted") alert("Push notifications enabled!");
+    }
+
+    function showNotification(alert) {
+      if (!("Notification" in window) || Notification.permission !== "granted") return;
+      new Notification(`🚀 ${alert.symbol} ${alert.pct_change >= 0 ? "+" : ""}${alert.pct_change.toFixed(2)}%`, {
+        body: alert.message,
+        tag: alert.id,
+      });
     }
 
     function renderTable(rockets) {
-      if (!rockets.length) {
-        return '<div class="empty">No rockets found with current filters. Try lowering thresholds.</div>';
-      }
-
-      const rows = rockets.map((r, i) => `
+      if (!rockets.length) return '<div class="empty">No rockets found. Try lowering filters.</div>';
+      const rows = rockets.map((r,i) => `
         <tr>
-          <td>${i + 1}</td>
+          <td>${i+1}</td>
           <td class="symbol">${r.symbol}</td>
           <td>$${r.price.toFixed(2)}</td>
-          <td class="${pctClass(r.pct_change)}">${r.pct_change >= 0 ? "+" : ""}${r.pct_change.toFixed(2)}%</td>
+          <td class="${pctClass(r.pct_change)}">${r.pct_change>=0?"+":""}${r.pct_change.toFixed(2)}%</td>
           <td class="hide-mobile">${formatVolume(r.volume)}</td>
           <td>${r.volume_ratio.toFixed(1)}x</td>
           <td class="hide-mobile">${r.rsi.toFixed(1)}</td>
-          <td class="hide-mobile">${r.trend_score.toFixed(1)}</td>
           <td>
             <div class="score-bar">
               <span>${r.rocket_score.toFixed(1)}</span>
               <div class="score-track"><div class="score-fill" style="width:${r.rocket_score}%"></div></div>
             </div>
           </td>
-        </tr>
-      `).join("");
+        </tr>`).join("");
+      return `<table><thead><tr>
+        <th>#</th><th>Symbol</th><th>Price</th><th>Change</th>
+        <th class="hide-mobile">Volume</th><th>Vol Ratio</th>
+        <th class="hide-mobile">RSI</th><th>Score</th>
+      </tr></thead><tbody>${rows}</tbody></table>`;
+    }
 
-      return `
-        <table>
-          <thead>
-            <tr>
-              <th>#</th>
-              <th>Symbol</th>
-              <th>Price</th>
-              <th>Change</th>
-              <th class="hide-mobile">Volume</th>
-              <th>Vol Ratio</th>
-              <th class="hide-mobile">RSI</th>
-              <th class="hide-mobile">Trend</th>
-              <th>Rocket Score</th>
-            </tr>
-          </thead>
-          <tbody>${rows}</tbody>
-        </table>
-      `;
+    async function updateSession() {
+      try {
+        const res = await fetch("/api/session");
+        const data = await res.json();
+        currentSession = data.session;
+        scanIntervalMs = data.scan_interval_seconds * 1000;
+
+        const badge = document.getElementById("sessionBadge");
+        badge.textContent = data.label;
+        badge.className = `badge ${data.session}`;
+        document.getElementById("sessionTime").textContent = data.et_time;
+
+        document.getElementById("cfgSession").textContent = SESSION_LABELS[data.session] || data.session;
+        document.getElementById("cfgInterval").textContent = `${data.scan_interval_seconds}s`;
+        document.getElementById("cfgMinChange").textContent = `${data.alert_thresholds.min_pct_change}%`;
+        document.getElementById("cfgMinVol").textContent = `${data.alert_thresholds.min_volume_ratio}x`;
+        document.getElementById("cfgMinScore").textContent = data.alert_thresholds.min_rocket_score;
+        document.getElementById("cfgNext").textContent = `${SESSION_LABELS[data.next_session] || data.next_session} @ ${data.next_session_at}`;
+
+        document.getElementById("autoBadge").textContent = `Auto-refresh: ${data.scan_interval_seconds}s`;
+      } catch(e) {}
     }
 
     async function runScan() {
       const btn = document.getElementById("scanBtn");
       const area = document.getElementById("resultsArea");
       const status = document.getElementById("statusText");
-
-      const minChange = document.getElementById("minChange").value;
-      const minVol = document.getElementById("minVol").value;
-      const limit = document.getElementById("limit").value;
-
       btn.disabled = true;
-      area.innerHTML = '<div class="loading">Scanning market…</div>';
+      area.innerHTML = '<div class="loading">Scanning…</div>';
       status.textContent = "Scanning…";
 
       try {
-        const url = `/api/rockets?min_change=${minChange}&min_volume_ratio=${minVol}&limit=${limit}`;
-        const res = await fetch(url);
+        const mc = document.getElementById("minChange").value;
+        const mv = document.getElementById("minVol").value;
+        const lim = document.getElementById("limit").value;
+        const res = await fetch(`/api/rockets?min_change=${mc}&min_volume_ratio=${mv}&limit=${lim}`);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
-
         area.innerHTML = renderTable(data.rockets);
-        const now = new Date().toLocaleTimeString();
-        status.textContent = `Found ${data.count} rockets · Updated ${now}`;
-      } catch (err) {
-        area.innerHTML = `<div class="error">Scan failed: ${err.message}. Is the server running?</div>`;
+        status.textContent = `${SESSION_LABELS[data.session]||data.session}: ${data.count} rockets · ${new Date().toLocaleTimeString()}`;
+      } catch(err) {
+        area.innerHTML = `<div class="error">Scan failed: ${err.message}</div>`;
         status.textContent = "Error";
       } finally {
         btn.disabled = false;
       }
     }
 
-    function startAutoRefresh() {
-      if (refreshTimer) clearInterval(refreshTimer);
-      refreshTimer = setInterval(runScan, 60000);
+    async function loadAlerts() {
+      const el = document.getElementById("alertHistory");
+      try {
+        const res = await fetch("/api/alerts?limit=50");
+        const data = await res.json();
+        if (!data.alerts.length) {
+          el.innerHTML = '<div class="empty">No alerts yet. Keep the scanner running during market hours.</div>';
+          return;
+        }
+        el.innerHTML = data.alerts.map(renderAlertItem).join("");
+        data.alerts.forEach(a => knownAlertIds.add(a.id));
+      } catch(e) {
+        el.innerHTML = '<div class="error">Failed to load alerts</div>';
+      }
     }
 
+    function connectSSE() {
+      if (eventSource) eventSource.close();
+      eventSource = new EventSource("/api/alerts/stream");
+
+      eventSource.onmessage = (e) => {
+        try { handleNewAlert(JSON.parse(e.data)); } catch(err) {}
+      };
+
+      eventSource.addEventListener("heartbeat", (e) => {
+        try {
+          const info = JSON.parse(e.data);
+          currentSession = info.session;
+          scanIntervalMs = info.scan_interval_seconds * 1000;
+          const badge = document.getElementById("sessionBadge");
+          badge.textContent = info.label;
+          badge.className = `badge ${info.session}`;
+          document.getElementById("sessionTime").textContent = info.et_time;
+        } catch(err) {}
+      });
+
+      eventSource.onerror = () => {
+        eventSource.close();
+        setTimeout(connectSSE, 5000);
+      };
+    }
+
+    function startAutoRefresh() {
+      if (refreshTimer) clearInterval(refreshTimer);
+      refreshTimer = setInterval(() => {
+        runScan();
+        updateSession();
+      }, scanIntervalMs);
+    }
+
+    // Init
+    updateSession();
     runScan();
+    loadAlerts();
+    connectSSE();
     startAutoRefresh();
+    setInterval(() => { startAutoRefresh(); }, 60000);
   </script>
 </body>
 </html>

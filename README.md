@@ -1,25 +1,30 @@
 # Market Rocket Scanner
 
-Scan the market for stocks making sharp moves — high % gains, volume surges, and strong momentum trends.
+Scan the market for stocks making sharp moves — with **automated Pre-Market, Intraday, and Post-Market alerts** to support daily trading.
 
 ## Features
 
-- **S&P 500 universe** (falls back to a curated watchlist if unavailable)
-- **Rocket scoring** combining:
-  - Daily % price change
-  - Volume vs 20-day average
-  - Linear-regression trend strength (scikit-learn)
-  - RSI momentum
+### Scanner
+- **Session-aware scanning** — different logic for pre-market, intraday, and post-market
+- **S&P 500 universe** (falls back to a curated 100-ticker watchlist)
+- **Rocket scoring** combining % change, volume surge, trend strength, and RSI
 - **Standard indicators**: RSI (Wilder), ATR (Wilder)
-- **Web dashboard** with filters and 60-second auto-refresh
-- **REST API** via FastAPI
+
+### Alerts (new)
+- **Pre-Market** (4:00–9:30 ET) — scans every 5 min for extended-hours movers
+- **Intraday** (9:30–16:00 ET) — scans every 2 min using 5-minute bars
+- **Post-Market** (16:00–20:00 ET) — scans every 5 min for after-hours moves
+- **Browser push notifications** + optional sound alerts
+- **Live SSE stream** for real-time alert delivery
+- **Discord / Telegram webhooks** for phone alerts (via `.env`)
 
 ## Project Structure
 
 ```
 data/           # Market data acquisition (yfinance)
-logic/          # Indicators + rocket scanner engine
-api/            # FastAPI backend
+logic/          # Indicators, scanner, sessions, alerts
+config/         # Session-specific alert thresholds
+api/            # FastAPI backend + background scheduler
 ui/             # Web dashboard
 run.py          # Server entry point
 ```
@@ -27,38 +32,43 @@ run.py          # Server entry point
 ## Quick Start
 
 ```bash
-# Install dependencies
 pip install -r requirements.txt
-
-# Start the server
-python run.py
+python3 run.py
 ```
 
-Open [http://localhost:8000](http://localhost:8000) in your browser.
+Open [http://localhost:8000](http://localhost:8000) → click **Enable Push** for browser notifications.
+
+### Phone alerts (optional)
+
+Copy `.env.example` to `.env` and add:
+
+```bash
+DISCORD_WEBHOOK_URL=https://discord.com/api/webhooks/...
+# or
+TELEGRAM_BOT_TOKEN=your_bot_token
+TELEGRAM_CHAT_ID=your_chat_id
+```
+
+## Session Alert Thresholds
+
+| Session | Scan Interval | Min % Change | Min Vol Ratio | Min Score |
+|---------|---------------|--------------|---------------|-----------|
+| Pre-Market | 5 min | 2.0% | 0.3x | 45 |
+| Intraday | 2 min | 1.5% | 1.5x | 50 |
+| Post-Market | 5 min | 2.0% | 0.3x | 45 |
 
 ## API
 
-### `GET /api/rockets`
-
-| Parameter | Default | Description |
-|-----------|---------|-------------|
-| `min_change` | `0` | Minimum daily % change |
-| `min_volume_ratio` | `1.0` | Minimum volume vs 20-day average |
-| `limit` | `25` | Max results (1–100) |
-
-Example:
-
-```bash
-curl "http://localhost:8000/api/rockets?min_change=3&min_volume_ratio=1.5&limit=10"
-```
-
-### `GET /api/health`
-
-Health check endpoint.
+| Endpoint | Description |
+|----------|-------------|
+| `GET /api/session` | Current market session + thresholds |
+| `GET /api/rockets` | Run a scan (session-aware) |
+| `GET /api/alerts` | Alert history |
+| `POST /api/alerts/scan` | Manually trigger scan + fire alerts |
+| `GET /api/alerts/stream` | SSE real-time alert stream |
+| `GET /api/scheduler/status` | Background scheduler status |
 
 ## Rocket Score
-
-Each stock is scored 0–100 using weighted factors:
 
 | Factor | Weight |
 |--------|--------|
@@ -69,8 +79,8 @@ Each stock is scored 0–100 using weighted factors:
 
 ## Data Source
 
-Market data is fetched via [yfinance](https://github.com/ranaroussi/yfinance). No API key required.
+Market data via [yfinance](https://github.com/ranaroussi/yfinance). No API key required.
 
 ## Legacy Demo
 
-The original single-symbol Alpha Vantage demo is still available at `ai-trading-demo.html`.
+The original single-symbol Alpha Vantage demo is at `ai-trading-demo.html`.

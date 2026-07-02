@@ -42,9 +42,15 @@ def get_sp500_symbols() -> list[str]:
     return DEFAULT_WATCHLIST.copy()
 
 
+def get_scan_universe() -> list[str]:
+    """Trading universe — default watchlist for faster intraday scans."""
+    return DEFAULT_WATCHLIST.copy()
+
+
 def fetch_market_data(
     symbols: list[str] | None = None,
     period: str = "1mo",
+    prepost: bool = False,
 ) -> pd.DataFrame:
     """
     Download OHLCV history for the given symbols.
@@ -56,7 +62,12 @@ def fetch_market_data(
     if not tickers:
         return pd.DataFrame()
 
-    logger.info("Fetching market data for %d symbols (period=%s)", len(tickers), period)
+    logger.info(
+        "Fetching market data for %d symbols (period=%s, prepost=%s)",
+        len(tickers),
+        period,
+        prepost,
+    )
     raw = yf.download(
         tickers,
         period=period,
@@ -64,9 +75,67 @@ def fetch_market_data(
         auto_adjust=True,
         threads=True,
         progress=False,
+        prepost=prepost,
     )
 
     if raw.empty:
         return pd.DataFrame()
 
     return raw
+
+
+def fetch_intraday_data(
+    symbols: list[str] | None = None,
+    interval: str = "5m",
+    period: str = "5d",
+) -> pd.DataFrame:
+    """Fetch intraday bars for momentum scanning during regular hours."""
+    tickers = symbols or get_scan_universe()
+    if not tickers:
+        return pd.DataFrame()
+
+    logger.info(
+        "Fetching intraday data for %d symbols (interval=%s)",
+        len(tickers),
+        interval,
+    )
+    raw = yf.download(
+        tickers,
+        period=period,
+        interval=interval,
+        group_by="ticker",
+        auto_adjust=True,
+        threads=True,
+        progress=False,
+        prepost=False,
+    )
+    return raw if not raw.empty else pd.DataFrame()
+
+
+def fetch_extended_hours_data(
+    symbols: list[str] | None = None,
+) -> pd.DataFrame:
+    """Fetch 1-minute bars including pre/post market for extended-hours alerts."""
+    tickers = symbols or get_scan_universe()
+    if not tickers:
+        return pd.DataFrame()
+
+    logger.info("Fetching extended-hours 1m data for %d symbols", len(tickers))
+    raw = yf.download(
+        tickers,
+        period="1d",
+        interval="1m",
+        group_by="ticker",
+        auto_adjust=True,
+        threads=True,
+        progress=False,
+        prepost=True,
+    )
+    return raw if not raw.empty else pd.DataFrame()
+
+
+def fetch_daily_reference(
+    symbols: list[str] | None = None,
+) -> pd.DataFrame:
+    """Daily OHLCV for baseline volume averages and prior close."""
+    return fetch_market_data(symbols or get_scan_universe(), period="1mo", prepost=False)
