@@ -2,7 +2,13 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Rockets">
+  <meta name="theme-color" content="#3b82f6">
+  <link rel="manifest" href="/static/manifest.json">
+  <link rel="apple-touch-icon" href="/static/icon.svg">
   <title>Market Rocket Scanner</title>
   <style>
     :root {
@@ -285,6 +291,32 @@
       .hide-mobile { display: none; }
       input, select { width: 100%; }
     }
+
+    .install-banner {
+      display: none;
+      background: linear-gradient(135deg, #1e3a5f, #1a2332);
+      border: 1px solid var(--accent);
+      border-radius: 12px;
+      padding: 14px 16px;
+      margin-bottom: 16px;
+      font-size: 0.85rem;
+      line-height: 1.5;
+    }
+
+    .install-banner.show { display: block; }
+
+    .install-banner strong { color: var(--accent); }
+
+    .install-banner ol {
+      margin: 8px 0 0 18px;
+      color: var(--muted);
+    }
+
+    .install-banner button {
+      margin-top: 10px;
+      padding: 8px 14px;
+      font-size: 0.8rem;
+    }
   </style>
 </head>
 <body>
@@ -299,6 +331,16 @@
         <span class="session-time" id="sessionTime"></span>
       </div>
     </header>
+
+    <div class="install-banner" id="installBanner">
+      <strong>📱 iPhone setup</strong> — Install as an app:
+      <ol>
+        <li>Tap the <strong>Share</strong> button (square + arrow)</li>
+        <li>Tap <strong>Add to Home Screen</strong></li>
+        <li>Open from your home screen like any app</li>
+      </ol>
+      <button class="secondary" onclick="dismissInstall()">Got it</button>
+    </div>
 
     <div class="tabs">
       <button class="tab active" data-tab="scanner" onclick="switchTab('scanner')">Scanner</button>
@@ -610,12 +652,42 @@
     }
 
     // Init
+    showInstallBanner();
+    registerServiceWorker();
     updateSession();
     runScan();
     loadAlerts();
     connectSSE();
     startAutoRefresh();
     setInterval(() => { startAutoRefresh(); }, 60000);
+
+    function isIOS() {
+      return /iPad|iPhone|iPod/.test(navigator.userAgent) || 
+        (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+    }
+
+    function isStandalone() {
+      return window.navigator.standalone === true ||
+        window.matchMedia("(display-mode: standalone)").matches;
+    }
+
+    function showInstallBanner() {
+      if (localStorage.getItem("installDismissed")) return;
+      if (isIOS() && !isStandalone()) {
+        document.getElementById("installBanner").classList.add("show");
+      }
+    }
+
+    function dismissInstall() {
+      localStorage.setItem("installDismissed", "1");
+      document.getElementById("installBanner").classList.remove("show");
+    }
+
+    function registerServiceWorker() {
+      if ("serviceWorker" in navigator) {
+        navigator.serviceWorker.register("/static/sw.js").catch(() => {});
+      }
+    }
   </script>
 </body>
 </html>

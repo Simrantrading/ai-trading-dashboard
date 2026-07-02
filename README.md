@@ -84,3 +84,7 @@ Market data via [yfinance](https://github.com/ranaroussi/yfinance). No API key r
 ## Legacy Demo
 
 The original single-symbol Alpha Vantage demo is at `ai-trading-demo.html`.
+
+## iPhone Only (No Mac)
+
+See **[PHONE_SETUP.md](PHONE_SETUP.md)** for cloud deploy + Telegram alerts + Add to Home Screen.

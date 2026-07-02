@@ -55,6 +55,29 @@ async def health():
     return {"status": "ok"}
 
 
+@app.get("/api/wake")
+async def wake():
+    """
+    Lightweight endpoint for external cron (free-tier hosting).
+    Wakes the server, runs a scan, and fires alerts to Telegram/Discord.
+  """
+    session = get_market_session().value
+    cfg = get_session_config(session)
+    rockets = scan_rockets(
+        min_pct_change=cfg.min_pct_change,
+        min_volume_ratio=cfg.min_volume_ratio,
+        limit=cfg.limit,
+        session=session,
+    )
+    new_alerts = process_scan_results(rockets, session)
+    return {
+        "status": "ok",
+        "session": session,
+        "rockets_found": len(rockets),
+        "alerts_fired": len(new_alerts),
+    }
+
+
 @app.get("/api/session")
 async def session():
     info = get_session_info()
