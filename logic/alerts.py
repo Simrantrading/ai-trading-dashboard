@@ -15,6 +15,7 @@ from typing import Any
 import httpx
 
 from config.alerts import ALERT_CONFIG, get_session_config
+from config.opportunities import get_opportunity_config
 from logic.sessions import MarketSession, get_market_session
 
 logger = logging.getLogger(__name__)
@@ -172,6 +173,82 @@ def build_alert(rocket: dict, session: str) -> Alert:
     )
 
 
+def build_buy_alert(opportunity: dict, session: str) -> Alert:
+    """Build an alert for a buy opportunity with reasons and expectations."""
+    confidence = opportunity["confidence"]
+    exp = opportunity["expectations"]
+    setup_label = opportunity["setup_label"]
+
+    if confidence >= 75:
+        sev = "high"
+    elif confidence >= 60:
+        sev = "medium"
+    else:
+        sev = "low"
+
+    session_label = {
+        "premarket": "Pre-Market",
+        "intraday": "Intraday",
+        "postmarket": "Post-Market",
+        "closed": "After-Hours",
+    }.get(session, session.title())
+
+    message = (
+        f"BUY {opportunity['symbol']} — {setup_label} "
+        f"@ ${opportunity['price']:.2f} | Confidence {confidence:.0f}% | "
+        f"Target ${exp['target']:.2f} · Stop ${exp['stop']:.2f} · R:R {exp['risk_reward']:.1f}"
+    )
+
+    return Alert(
+        id=str(uuid.uuid4())[:8],
+        symbol=opportunity["symbol"],
+        session=session,
+        alert_type=f"buy_{opportunity['setup_type']}",
+        severity=sev,
+        message=message,
+        price=opportunity["price"],
+        pct_change=opportunity["pct_change"],
+        volume_ratio=opportunity["volume_ratio"],
+        rocket_score=confidence,
+        timestamp=datetime.now(timezone.utc).isoformat(),
+        meta={
+            "direction": "buy",
+            "setup_type": opportunity["setup_type"],
+            "setup_label": setup_label,
+            "confidence": confidence,
+            "reasons": opportunity["reasons"],
+            "expectations": exp,
+            "rsi": opportunity.get("rsi"),
+            "trend_score": opportunity.get("trend_score"),
+            "atr": opportunity.get("atr"),
+        },
+    )
+
+
+def process_buy_opportunities(
+    opportunities: list[dict], session: str | None = None
+) -> list[dict]:
+    """Evaluate buy opportunities and fire alerts."""
+    session = session or get_market_session().value
+    cfg = get_opportunity_config(session)
+    fired: list[dict] = []
+
+    for opp in opportunities:
+        if opp["confidence"] < cfg.min_confidence:
+            continue
+        if opp["volume_ratio"] < cfg.min_volume_ratio:
+            continue
+
+        alert = build_buy_alert(opp, session)
+        if alert_store.add_alert(alert, cfg.alert_cooldown_seconds):
+            fired.append(asdict(alert))
+            _dispatch_webhooks(alert)
+
+    if fired:
+        logger.info("Fired %d buy opportunity alerts for session=%s", len(fired), session)
+    return fired
+
+
 def process_scan_results(rockets: list[dict], session: str | None = None) -> list[dict]:
     """Evaluate scan results and fire new alerts."""
     session = session or get_market_session().value
@@ -196,6 +273,35 @@ def process_scan_results(rockets: list[dict], session: str | None = None) -> lis
     return fired
 
 
+def _format_webhook_message(alert: Alert) -> str:
+    """Format alert for Discord/Telegram, with extra detail for buy opportunities."""
+    emoji = {"high": "🚨", "medium": "⚡", "low": "📢"}.get(alert.severity, "📢")
+    meta = alert.meta or {}
+
+    if meta.get("direction") == "buy":
+        reasons = meta.get("reasons", [])
+        exp = meta.get("expectations", {})
+        lines = [
+            f"{emoji} **BUY {alert.symbol}** — {meta.get('setup_label', 'Buy Setup')}",
+            f"Confidence: {meta.get('confidence', alert.rocket_score):.0f}%",
+            "",
+            "**Why:**",
+        ]
+        for reason in reasons:
+            lines.append(f"• {reason}")
+        lines.extend([
+            "",
+            "**Expectations:**",
+            f"Entry: ${exp.get('entry', alert.price):.2f}",
+            f"Target: ${exp.get('target', 0):.2f}",
+            f"Stop: ${exp.get('stop', 0):.2f}",
+            f"R:R {exp.get('risk_reward', 0):.1f} · {exp.get('timeframe', '')}",
+        ])
+        return "\n".join(lines)
+
+    return f"{emoji} **{alert.symbol}** — {alert.message}"
+
+
 def _dispatch_webhooks(alert: Alert) -> None:
     if not ALERT_CONFIG.get("webhook_enabled"):
         return
@@ -204,22 +310,21 @@ def _dispatch_webhooks(alert: Alert) -> None:
     telegram_token = os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
     telegram_chat = os.getenv("TELEGRAM_CHAT_ID", "").strip()
 
-    emoji = {"high": "🚨", "medium": "⚡", "low": "📢"}.get(alert.severity, "📢")
+    body = _format_webhook_message(alert)
 
     try:
         if discord_url:
             payload = {
-                "content": f"{emoji} **{alert.symbol}** — {alert.message}",
+                "content": body,
                 "username": "Rocket Scanner",
             }
             httpx.post(discord_url, json=payload, timeout=10)
 
         if telegram_token and telegram_chat:
-            text = f"{emoji} *{alert.symbol}*\n{alert.message}"
             url = f"https://api.telegram.org/bot{telegram_token}/sendMessage"
             httpx.post(
                 url,
-                json={"chat_id": telegram_chat, "text": text, "parse_mode": "Markdown"},
+                json={"chat_id": telegram_chat, "text": body, "parse_mode": "Markdown"},
                 timeout=10,
             )
     except Exception as exc:

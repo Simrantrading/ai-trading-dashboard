@@ -14,7 +14,9 @@ from fastapi.staticfiles import StaticFiles
 
 from api.scheduler import get_last_scan, start_scheduler, stop_scheduler
 from config.alerts import get_session_config
-from logic.alerts import alert_store, process_scan_results
+from config.opportunities import get_opportunity_config
+from logic.alerts import alert_store, process_buy_opportunities, process_scan_results
+from logic.opportunities import scan_buy_opportunities
 from logic.scanner import scan_rockets
 from logic.sessions import get_market_session, get_session_info
 
@@ -77,11 +79,15 @@ async def wake():
         session=session,
     )
     new_alerts = await asyncio.to_thread(process_scan_results, rockets, session)
+    buy_opps = await asyncio.to_thread(scan_buy_opportunities, session)
+    buy_alerts = await asyncio.to_thread(process_buy_opportunities, buy_opps, session)
     return {
         "status": "ok",
         "session": session,
         "rockets_found": len(rockets),
         "alerts_fired": len(new_alerts),
+        "buy_opportunities": len(buy_opps),
+        "buy_alerts_fired": len(buy_alerts),
     }
 
 
@@ -89,6 +95,7 @@ async def wake():
 async def session():
     info = get_session_info()
     cfg = get_session_config(info["session"])
+    opp_cfg = get_opportunity_config(info["session"])
     return {
         **info,
         "alert_thresholds": {
@@ -96,6 +103,10 @@ async def session():
             "min_volume_ratio": cfg.min_volume_ratio,
             "min_rocket_score": cfg.min_rocket_score,
             "scan_interval_seconds": cfg.scan_interval_seconds,
+        },
+        "buy_thresholds": {
+            "min_confidence": opp_cfg.min_confidence,
+            "min_volume_ratio": opp_cfg.min_volume_ratio,
         },
     }
 
@@ -153,12 +164,62 @@ async def trigger_scan():
         session=session,
     )
     new_alerts = await asyncio.to_thread(process_scan_results, rockets, session)
+    buy_opps = await asyncio.to_thread(scan_buy_opportunities, session)
+    buy_alerts = await asyncio.to_thread(process_buy_opportunities, buy_opps, session)
     return {
         "session": session,
         "rockets_found": len(rockets),
         "alerts_fired": len(new_alerts),
         "new_alerts": new_alerts,
+        "buy_opportunities": len(buy_opps),
+        "buy_alerts_fired": len(buy_alerts),
+        "new_buy_alerts": buy_alerts,
         "rockets": rockets[:10],
+        "opportunities": buy_opps[:10],
+    }
+
+
+@app.get("/api/opportunities")
+async def get_opportunities(
+    min_confidence: float | None = Query(None, description="Minimum confidence score"),
+    min_volume_ratio: float | None = Query(None, description="Minimum volume vs avg"),
+    limit: int = Query(20, ge=1, le=50, description="Max results"),
+    session: str | None = Query(None, description="Force session"),
+):
+    active = session or get_market_session().value
+    cfg = get_opportunity_config(active)
+
+    opportunities = await asyncio.to_thread(
+        scan_buy_opportunities,
+        session=active,
+        min_confidence=min_confidence if min_confidence is not None else cfg.min_confidence,
+        min_volume_ratio=min_volume_ratio if min_volume_ratio is not None else cfg.min_volume_ratio,
+        limit=limit,
+    )
+    return {
+        "count": len(opportunities),
+        "session": active,
+        "filters": {
+            "min_confidence": min_confidence if min_confidence is not None else cfg.min_confidence,
+            "min_volume_ratio": min_volume_ratio if min_volume_ratio is not None else cfg.min_volume_ratio,
+            "limit": limit,
+        },
+        "opportunities": opportunities,
+    }
+
+
+@app.post("/api/opportunities/scan")
+async def trigger_opportunity_scan():
+    """Scan for buy opportunities and fire alerts."""
+    session = get_market_session().value
+    opportunities = await asyncio.to_thread(scan_buy_opportunities, session)
+    buy_alerts = await asyncio.to_thread(process_buy_opportunities, opportunities, session)
+    return {
+        "session": session,
+        "opportunities_found": len(opportunities),
+        "buy_alerts_fired": len(buy_alerts),
+        "new_buy_alerts": buy_alerts,
+        "opportunities": opportunities,
     }
 
 
