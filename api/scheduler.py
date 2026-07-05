@@ -10,7 +10,8 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.interval import IntervalTrigger
 
 from config.alerts import get_session_config
-from logic.alerts import process_scan_results
+from logic.alerts import process_buy_opportunities, process_scan_results
+from logic.opportunities import scan_buy_opportunities
 from logic.scanner import scan_rockets
 from logic.sessions import MarketSession, get_market_session, get_session_info
 
@@ -34,16 +35,23 @@ def _run_scheduled_scan() -> None:
             session=session.value,
         )
         new_alerts = process_scan_results(rockets, session.value)
+        buy_opps = scan_buy_opportunities(session.value)
+        buy_alerts = process_buy_opportunities(buy_opps, session.value)
         _last_scan = {
             "session": session.value,
             "rockets_found": len(rockets),
             "alerts_fired": len(new_alerts),
+            "buy_opportunities": len(buy_opps),
+            "buy_alerts_fired": len(buy_alerts),
             "top_symbol": rockets[0]["symbol"] if rockets else None,
+            "top_buy": buy_opps[0]["symbol"] if buy_opps else None,
         }
         logger.info(
-            "Scan complete: %d rockets, %d new alerts",
+            "Scan complete: %d rockets, %d alerts, %d buy opps, %d buy alerts",
             len(rockets),
             len(new_alerts),
+            len(buy_opps),
+            len(buy_alerts),
         )
     except Exception as exc:
         logger.exception("Scheduled scan failed: %s", exc)

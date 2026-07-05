@@ -229,6 +229,63 @@
     .alert-item.high { border-left: 3px solid var(--red); }
     .alert-item.medium { border-left: 3px solid var(--orange); }
     .alert-item.low { border-left: 3px solid var(--accent); }
+    .alert-item.buy { border-left: 3px solid var(--green); background: rgba(34,197,94,0.04); }
+
+    .alert-reasons {
+      margin-top: 8px;
+      padding-left: 0;
+      list-style: none;
+      font-size: 0.8rem;
+      color: var(--muted);
+      line-height: 1.5;
+    }
+
+    .alert-reasons li::before { content: "→ "; color: var(--green); }
+
+    .alert-expectations {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 6px;
+      margin-top: 8px;
+      font-size: 0.78rem;
+    }
+
+    .exp-cell {
+      background: rgba(0,0,0,0.2);
+      border-radius: 6px;
+      padding: 6px 8px;
+    }
+
+    .exp-cell .exp-label { color: var(--muted); font-size: 0.65rem; text-transform: uppercase; }
+    .exp-cell .exp-value { font-weight: 600; margin-top: 1px; }
+
+    .setup-badge {
+      display: inline-block;
+      font-size: 0.68rem;
+      padding: 2px 7px;
+      border-radius: 4px;
+      background: rgba(34,197,94,0.15);
+      color: var(--green);
+      font-weight: 600;
+      margin-left: 6px;
+    }
+
+    .confidence-bar {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.8rem;
+    }
+
+    .conf-track {
+      height: 5px; background: var(--border); border-radius: 3px;
+      width: 80px; overflow: hidden;
+    }
+
+    .conf-fill {
+      height: 100%; border-radius: 3px;
+      background: linear-gradient(90deg, var(--green), var(--yellow));
+    }
 
     .alert-top {
       display: flex;
@@ -324,7 +381,7 @@
     <header>
       <div>
         <h1>🚀 Market Rocket Scanner</h1>
-        <p class="subtitle">Pre-market · Intraday · Post-market alerts for day trading</p>
+        <p class="subtitle">Momentum rockets · Buy signal alerts · Pre/intra/post-market</p>
       </div>
       <div class="session-pill">
         <span class="badge intraday" id="sessionBadge">Loading…</span>
@@ -344,6 +401,7 @@
 
     <div class="tabs">
       <button class="tab active" data-tab="scanner" onclick="switchTab('scanner')">Scanner</button>
+      <button class="tab" data-tab="buy" onclick="switchTab('buy')">Buy Signals</button>
       <button class="tab" data-tab="alerts" onclick="switchTab('alerts')">
         Alerts <span id="alertCount"></span>
       </button>
@@ -392,6 +450,36 @@
       </div>
     </div>
 
+    <!-- BUY OPPORTUNITIES -->
+    <div class="panel" id="panel-buy">
+      <div class="card">
+        <div class="controls">
+          <div class="field">
+            <label>Min Confidence</label>
+            <input type="number" id="minConfidence" value="55" step="5" min="40" max="90">
+          </div>
+          <div class="field">
+            <label>Min Vol Ratio</label>
+            <input type="number" id="minBuyVol" value="1.0" step="0.1">
+          </div>
+          <div class="field">
+            <label>Limit</label>
+            <select id="buyLimit">
+              <option value="10">10</option>
+              <option value="20" selected>20</option>
+              <option value="30">30</option>
+            </select>
+          </div>
+          <button id="buyScanBtn" onclick="runBuyScan()">Scan Buy Signals</button>
+        </div>
+        <div class="status-bar">
+          <span id="buyStatusText">Ready</span>
+          <span id="buyAutoBadge">Scans with scheduled alerts</span>
+        </div>
+        <div id="buyResultsArea"><div class="loading">Tap "Scan Buy Signals" to find opportunities…</div></div>
+      </div>
+    </div>
+
     <!-- ALERTS HISTORY -->
     <div class="panel" id="panel-alerts">
       <div class="card">
@@ -423,6 +511,7 @@
           <div class="info-cell"><div class="label">Min % Change</div><div class="value" id="cfgMinChange">—</div></div>
           <div class="info-cell"><div class="label">Min Vol Ratio</div><div class="value" id="cfgMinVol">—</div></div>
           <div class="info-cell"><div class="label">Min Rocket Score</div><div class="value" id="cfgMinScore">—</div></div>
+          <div class="info-cell"><div class="label">Min Buy Confidence</div><div class="value" id="cfgMinBuyConf">—</div></div>
           <div class="info-cell"><div class="label">Next Session</div><div class="value" id="cfgNext">—</div></div>
         </div>
         <div style="padding:14px 16px;font-size:0.82rem;color:var(--muted);line-height:1.5">
@@ -474,13 +563,37 @@
     }
 
     function renderAlertItem(a) {
+      const isBuy = a.meta && a.meta.direction === "buy";
+      const cls = isBuy ? `buy ${a.severity}` : a.severity;
+
+      let extra = "";
+      if (isBuy && a.meta) {
+        const reasons = (a.meta.reasons || []).map(r => `<li>${r}</li>`).join("");
+        const exp = a.meta.expectations || {};
+        extra = `
+          <div style="margin-top:6px">
+            <span class="setup-badge">${a.meta.setup_label || "Buy Setup"}</span>
+            <span style="font-size:0.75rem;color:var(--muted);margin-left:8px">
+              Confidence ${(a.meta.confidence || a.rocket_score).toFixed(0)}%
+            </span>
+          </div>
+          ${reasons ? `<ul class="alert-reasons">${reasons}</ul>` : ""}
+          <div class="alert-expectations">
+            <div class="exp-cell"><div class="exp-label">Entry</div><div class="exp-value">$${(exp.entry||a.price).toFixed(2)}</div></div>
+            <div class="exp-cell"><div class="exp-label">Target</div><div class="exp-value positive">$${(exp.target||0).toFixed(2)}</div></div>
+            <div class="exp-cell"><div class="exp-label">Stop</div><div class="exp-value negative">$${(exp.stop||0).toFixed(2)}</div></div>
+            <div class="exp-cell"><div class="exp-label">R:R · Timeframe</div><div class="exp-value">${(exp.risk_reward||0).toFixed(1)} · ${exp.timeframe||"—"}</div></div>
+          </div>`;
+      }
+
       return `
-        <div class="alert-item ${a.severity}">
+        <div class="alert-item ${cls}">
           <div class="alert-top">
-            <span class="alert-symbol">${a.symbol}</span>
+            <span class="alert-symbol">${isBuy ? "📈 " : ""}${a.symbol}</span>
             <span class="alert-session">${SESSION_LABELS[a.session] || a.session}</span>
           </div>
           <div class="alert-msg">${a.message}</div>
+          ${extra}
           <div class="alert-time">${formatTime(a.timestamp)} · ${a.alert_type.replace(/_/g," ")}</div>
         </div>`;
     }
@@ -522,10 +635,69 @@
 
     function showNotification(alert) {
       if (!("Notification" in window) || Notification.permission !== "granted") return;
-      new Notification(`🚀 ${alert.symbol} ${alert.pct_change >= 0 ? "+" : ""}${alert.pct_change.toFixed(2)}%`, {
-        body: alert.message,
-        tag: alert.id,
-      });
+      const isBuy = alert.meta && alert.meta.direction === "buy";
+      const title = isBuy
+        ? `📈 BUY ${alert.symbol} — ${alert.meta.setup_label || "Setup"}`
+        : `🚀 ${alert.symbol} ${alert.pct_change >= 0 ? "+" : ""}${alert.pct_change.toFixed(2)}%`;
+      const body = isBuy && alert.meta.reasons
+        ? alert.meta.reasons.slice(0, 2).join(" · ")
+        : alert.message;
+      new Notification(title, { body, tag: alert.id });
+    }
+
+    function renderBuyTable(opportunities) {
+      if (!opportunities.length) return '<div class="empty">No buy setups found. Try lowering confidence threshold.</div>';
+      const rows = opportunities.map((o, i) => {
+        const exp = o.expectations || {};
+        const reasons = (o.reasons || []).slice(0, 2).map(r => `<div style="font-size:0.75rem;color:var(--muted)">→ ${r}</div>`).join("");
+        return `
+        <tr>
+          <td>${i+1}</td>
+          <td class="symbol">${o.symbol}<div style="font-size:0.7rem;color:var(--green);margin-top:2px">${o.setup_label}</div></td>
+          <td>$${o.price.toFixed(2)}</td>
+          <td class="hide-mobile">${o.rsi.toFixed(1)}</td>
+          <td class="hide-mobile">${o.trend_score.toFixed(0)}</td>
+          <td>
+            <div class="confidence-bar">
+              <span>${o.confidence.toFixed(0)}%</span>
+              <div class="conf-track"><div class="conf-fill" style="width:${o.confidence}%"></div></div>
+            </div>
+          </td>
+          <td class="positive hide-mobile">$${(exp.target||0).toFixed(2)}</td>
+          <td class="negative hide-mobile">$${(exp.stop||0).toFixed(2)}</td>
+          <td class="hide-mobile">${(exp.risk_reward||0).toFixed(1)}</td>
+        </tr>
+        <tr><td colspan="9" style="padding-top:0;border-bottom:1px solid var(--border)">${reasons}</td></tr>`;
+      }).join("");
+      return `<table><thead><tr>
+        <th>#</th><th>Symbol / Setup</th><th>Price</th>
+        <th class="hide-mobile">RSI</th><th class="hide-mobile">Trend</th><th>Confidence</th>
+        <th class="hide-mobile">Target</th><th class="hide-mobile">Stop</th><th class="hide-mobile">R:R</th>
+      </tr></thead><tbody>${rows}</tbody></table>`;
+    }
+
+    async function runBuyScan() {
+      const btn = document.getElementById("buyScanBtn");
+      const area = document.getElementById("buyResultsArea");
+      const status = document.getElementById("buyStatusText");
+      btn.disabled = true;
+      area.innerHTML = '<div class="loading">Scanning for buy opportunities…</div>';
+      status.textContent = "Scanning…";
+
+      try {
+        await wakeServer();
+        const mc = document.getElementById("minConfidence").value;
+        const mv = document.getElementById("minBuyVol").value;
+        const lim = document.getElementById("buyLimit").value;
+        const data = await fetchWithRetry(`/api/opportunities?min_confidence=${mc}&min_volume_ratio=${mv}&limit=${lim}`);
+        area.innerHTML = renderBuyTable(data.opportunities);
+        status.textContent = `${data.count} buy setups · ${new Date().toLocaleTimeString()}`;
+      } catch(err) {
+        area.innerHTML = `<div class="error">Scan failed: ${err.message}</div>`;
+        status.textContent = "Error — retry";
+      } finally {
+        btn.disabled = false;
+      }
     }
 
     function renderTable(rockets) {
@@ -570,6 +742,9 @@
         document.getElementById("cfgMinChange").textContent = `${data.alert_thresholds.min_pct_change}%`;
         document.getElementById("cfgMinVol").textContent = `${data.alert_thresholds.min_volume_ratio}x`;
         document.getElementById("cfgMinScore").textContent = data.alert_thresholds.min_rocket_score;
+        if (data.buy_thresholds) {
+          document.getElementById("cfgMinBuyConf").textContent = `${data.buy_thresholds.min_confidence}%`;
+        }
         document.getElementById("cfgNext").textContent = `${SESSION_LABELS[data.next_session] || data.next_session} @ ${data.next_session_at}`;
 
         document.getElementById("autoBadge").textContent = `Auto-refresh: ${data.scan_interval_seconds}s`;
