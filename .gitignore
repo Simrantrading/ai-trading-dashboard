@@ -4,3 +4,4 @@ __pycache__/
 .venv/
 venv/
 data/alerts_history.json
+data/news_alerts_history.json

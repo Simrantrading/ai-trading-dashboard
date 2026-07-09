@@ -40,6 +40,10 @@ If you only have your phone:
 
 Safari can't run scans in the background. **Telegram delivers alerts** even when the app is closed.
 
+You'll receive two types of alerts:
+- **Rocket alerts** — stocks making sharp price moves
+- **News alerts** — major headlines from CNBC, Bloomberg, Yahoo Finance, WSJ, MarketWatch, and more that can move the market or specific sectors
+
 1. Open Telegram → search **@BotFather**
 2. Send `/newbot` → follow steps → copy your **bot token**
 3. Start a chat with your new bot → send any message
@@ -55,7 +59,20 @@ Safari can't run scans in the background. **Telegram delivers alerts** even when
    - `TELEGRAM_BOT_TOKEN` = your bot token
    - `TELEGRAM_CHAT_ID` = your chat ID
 
-7. Redeploy. You'll get rocket alerts in Telegram all day.
+7. Redeploy. You'll get rocket **and news** alerts in Telegram all day.
+
+### News alert sources
+
+| Source | Coverage |
+|--------|----------|
+| CNBC | Top news, markets, economy, earnings |
+| Bloomberg | Markets |
+| Yahoo Finance | Breaking finance headlines |
+| WSJ | Markets |
+| MarketWatch | Top stories |
+| Seeking Alpha | Market currents |
+
+News is polled every **3 minutes** during market hours and filtered for major impact (Fed, earnings, mergers, sector moves, market-wide events). Set `NEWS_ALERTS_ENABLED=false` in Render env to disable.
 
 ---
 
@@ -70,7 +87,7 @@ Free Render sleeps after 15 min idle. Use a free cron to wake it:
    - **Active hours**: 4:00–20:00 ET (market hours)
 3. Save
 
-Each ping runs a scan and sends Telegram alerts.
+Each ping runs a scan, checks news feeds, and sends Telegram alerts.
 
 ---
 
@@ -89,7 +106,7 @@ Opens like a native app. Tap **Enable Push** inside for Safari notifications too
 
 | When | What to do |
 |------|------------|
-| Pre-market (4–9:30 ET) | Check Telegram for alerts |
+| Pre-market (4–9:30 ET) | Check Telegram for rocket + news alerts |
 | Intraday | Open home screen app or Telegram |
 | Post-market (4–8 ET) | Telegram alerts continue |
 | Anytime | Open app → **Scan Now** for live results |

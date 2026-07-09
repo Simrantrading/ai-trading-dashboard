@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
-import os
+import re
 import uuid
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
@@ -12,10 +12,9 @@ from pathlib import Path
 from threading import Lock
 from typing import Any
 
-import httpx
-
 from config.alerts import ALERT_CONFIG, get_session_config
 from logic.sessions import MarketSession, get_market_session
+from logic.webhooks import send_phone_alert
 
 logger = logging.getLogger(__name__)
 
@@ -200,27 +199,9 @@ def _dispatch_webhooks(alert: Alert) -> None:
     if not ALERT_CONFIG.get("webhook_enabled"):
         return
 
-    discord_url = os.getenv("DISCORD_WEBHOOK_URL", "").strip()
-    telegram_token = os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
-    telegram_chat = os.getenv("TELEGRAM_CHAT_ID", "").strip()
-
     emoji = {"high": "🚨", "medium": "⚡", "low": "📢"}.get(alert.severity, "📢")
-
-    try:
-        if discord_url:
-            payload = {
-                "content": f"{emoji} **{alert.symbol}** — {alert.message}",
-                "username": "Rocket Scanner",
-            }
-            httpx.post(discord_url, json=payload, timeout=10)
-
-        if telegram_token and telegram_chat:
-            text = f"{emoji} *{alert.symbol}*\n{alert.message}"
-            url = f"https://api.telegram.org/bot{telegram_token}/sendMessage"
-            httpx.post(
-                url,
-                json={"chat_id": telegram_chat, "text": text, "parse_mode": "Markdown"},
-                timeout=10,
-            )
-    except Exception as exc:
-        logger.warning("Webhook delivery failed: %s", exc)
+    send_phone_alert(
+        title=alert.symbol,
+        message=f"{emoji} {alert.message}",
+        severity=alert.severity,
+    )
