@@ -10,10 +10,11 @@ Scan the market for stocks making sharp moves — with **automated Pre-Market, I
 - **Rocket scoring** combining % change, volume surge, trend strength, and RSI
 - **Standard indicators**: RSI (Wilder), ATR (Wilder)
 
-### Alerts (new)
+### Alerts
 - **Pre-Market** (4:00–9:30 ET) — scans every 5 min for extended-hours movers
 - **Intraday** (9:30–16:00 ET) — scans every 2 min using 5-minute bars
 - **Post-Market** (16:00–20:00 ET) — scans every 5 min for after-hours moves
+- **Market news** — polls CNBC, Bloomberg, Yahoo Finance, WSJ, MarketWatch every 3 min for major headlines
 - **Browser push notifications** + optional sound alerts
 - **Live SSE stream** for real-time alert delivery
 - **Discord / Telegram webhooks** for phone alerts (via `.env`)
@@ -47,6 +48,7 @@ DISCORD_WEBHOOK_URL=https://discord.com/api/webhooks/...
 # or
 TELEGRAM_BOT_TOKEN=your_bot_token
 TELEGRAM_CHAT_ID=your_chat_id
+NEWS_ALERTS_ENABLED=true
 ```
 
 ## Session Alert Thresholds
@@ -66,6 +68,8 @@ TELEGRAM_CHAT_ID=your_chat_id
 | `GET /api/alerts` | Alert history |
 | `POST /api/alerts/scan` | Manually trigger scan + fire alerts |
 | `GET /api/alerts/stream` | SSE real-time alert stream |
+| `GET /api/news` | Market news alert history |
+| `POST /api/news/check` | Manually poll news feeds + fire alerts |
 | `GET /api/scheduler/status` | Background scheduler status |
 
 ## Rocket Score

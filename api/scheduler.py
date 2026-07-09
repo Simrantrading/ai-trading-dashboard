@@ -1,4 +1,4 @@
-"""Background scheduler for session-aware market scans and alerts."""
+"""Background scheduler for session-aware market scans and news alerts."""
 
 from __future__ import annotations
 
@@ -10,7 +10,9 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.interval import IntervalTrigger
 
 from config.alerts import get_session_config
+from config.news import NEWS_CONFIG
 from logic.alerts import process_scan_results
+from logic.news_alerts import run_news_poll
 from logic.scanner import scan_rockets
 from logic.sessions import MarketSession, get_market_session, get_session_info
 
@@ -18,6 +20,18 @@ logger = logging.getLogger(__name__)
 
 _scheduler: BackgroundScheduler | None = None
 _last_scan: dict | None = None
+
+
+def _news_poll_interval_seconds() -> int:
+    session = get_market_session()
+    if session == MarketSession.CLOSED:
+        return NEWS_CONFIG["poll_interval_closed_seconds"]
+    return NEWS_CONFIG["poll_interval_market_seconds"]
+
+
+def _run_news_poll() -> None:
+    logger.info("Running scheduled news poll")
+    run_news_poll()
 
 
 def _run_scheduled_scan() -> None:
@@ -62,9 +76,14 @@ def _reschedule_for_session() -> None:
         "market_scan",
         trigger=IntervalTrigger(seconds=interval),
     )
+    _scheduler.reschedule_job(
+        "news_poll",
+        trigger=IntervalTrigger(seconds=_news_poll_interval_seconds()),
+    )
     logger.info(
-        "Rescheduled scan to every %ds for session=%s",
+        "Rescheduled scan to every %ds, news every %ds for session=%s",
         interval,
+        _news_poll_interval_seconds(),
         info["session"],
     )
 
@@ -86,6 +105,15 @@ def start_scheduler() -> BackgroundScheduler:
         coalesce=True,
     )
 
+    _scheduler.add_job(
+        _run_news_poll,
+        trigger=IntervalTrigger(seconds=_news_poll_interval_seconds()),
+        id="news_poll",
+        replace_existing=True,
+        max_instances=1,
+        coalesce=True,
+    )
+
     # Re-check session boundaries every minute
     _scheduler.add_job(
         _reschedule_for_session,
@@ -100,6 +128,13 @@ def start_scheduler() -> BackgroundScheduler:
         id="startup_scan",
         replace_existing=True,
         next_run_time=datetime.now() + timedelta(seconds=60),
+    )
+
+    _scheduler.add_job(
+        _run_news_poll,
+        id="startup_news_poll",
+        replace_existing=True,
+        next_run_time=datetime.now() + timedelta(seconds=90),
     )
 
     _scheduler.start()

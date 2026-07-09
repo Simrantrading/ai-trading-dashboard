@@ -15,6 +15,7 @@ from fastapi.staticfiles import StaticFiles
 from api.scheduler import get_last_scan, start_scheduler, stop_scheduler
 from config.alerts import get_session_config
 from logic.alerts import alert_store, process_scan_results
+from logic.news_alerts import news_alert_store, run_news_poll
 from logic.scanner import scan_rockets
 from logic.sessions import get_market_session, get_session_info
 
@@ -77,11 +78,13 @@ async def wake():
         session=session,
     )
     new_alerts = await asyncio.to_thread(process_scan_results, rockets, session)
+    news_result = await asyncio.to_thread(run_news_poll)
     return {
         "status": "ok",
         "session": session,
         "rockets_found": len(rockets),
         "alerts_fired": len(new_alerts),
+        "news_alerts_fired": news_result.get("alerts_fired", 0),
     }
 
 
@@ -186,7 +189,25 @@ async def alert_stream():
 
 @app.get("/api/scheduler/status")
 async def scheduler_status():
+    from logic.news_alerts import get_last_news_poll
+
     return {
         "session": get_session_info(),
         "last_scan": get_last_scan(),
+        "last_news_poll": get_last_news_poll(),
     }
+
+
+@app.get("/api/news")
+async def get_news_alerts(
+    limit: int = Query(50, ge=1, le=200),
+):
+    alerts = news_alert_store.list_alerts(limit=limit)
+    return {"count": len(alerts), "alerts": alerts}
+
+
+@app.post("/api/news/check")
+async def trigger_news_check():
+    """Manually poll news feeds and fire phone alerts for major headlines."""
+    result = await asyncio.to_thread(run_news_poll)
+    return result

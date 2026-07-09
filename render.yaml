@@ -15,3 +15,5 @@ services:
         sync: false
       - key: DISCORD_WEBHOOK_URL
         sync: false
+      - key: NEWS_ALERTS_ENABLED
+        value: true
