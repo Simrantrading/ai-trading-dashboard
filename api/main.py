@@ -15,6 +15,7 @@ from fastapi.staticfiles import StaticFiles
 from api.scheduler import get_last_scan, start_scheduler, stop_scheduler
 from config.alerts import get_session_config
 from logic.alerts import alert_store, process_scan_results
+from logic.portfolio import DEFAULT_HOLDINGS, suggest_additions
 from logic.scanner import scan_rockets
 from logic.sessions import get_market_session, get_session_info
 
@@ -190,3 +191,15 @@ async def scheduler_status():
         "session": get_session_info(),
         "last_scan": get_last_scan(),
     }
+
+
+@app.get("/api/portfolio/suggest")
+async def portfolio_suggest(
+    limit: int = Query(5, ge=1, le=15, description="Max add suggestions"),
+):
+    """
+    Analyze the default Prime Account snapshot and suggest names to add.
+    Scores trend, RSI, ATR%, and diversification vs semiconductor concentration.
+    """
+    result = await asyncio.to_thread(suggest_additions, DEFAULT_HOLDINGS, limit)
+    return result

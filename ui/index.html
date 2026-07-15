@@ -344,6 +344,7 @@
 
     <div class="tabs">
       <button class="tab active" data-tab="scanner" onclick="switchTab('scanner')">Scanner</button>
+      <button class="tab" data-tab="portfolio" onclick="switchTab('portfolio')">Portfolio</button>
       <button class="tab" data-tab="alerts" onclick="switchTab('alerts')">
         Alerts <span id="alertCount"></span>
       </button>
@@ -388,6 +389,34 @@
           <div class="alert-list" id="liveAlerts">
             <div class="loading">Waiting for alerts…</div>
           </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PORTFOLIO -->
+    <div class="panel" id="panel-portfolio">
+      <div class="card" style="margin-bottom:16px">
+        <div class="card-header">
+          <span>Prime Account · what to add</span>
+          <button class="secondary" style="padding:4px 10px;font-size:0.75rem" onclick="loadPortfolio()">Refresh</button>
+        </div>
+        <div class="info-grid" id="portfolioSummary">
+          <div class="info-cell"><div class="label">Book value</div><div class="value" id="pfValue">—</div></div>
+          <div class="info-cell"><div class="label">Semi weight</div><div class="value" id="pfSemi">—</div></div>
+          <div class="info-cell"><div class="label">Space weight</div><div class="value" id="pfSpace">—</div></div>
+          <div class="info-cell"><div class="label">Risk flags</div><div class="value" id="pfRisks">—</div></div>
+        </div>
+        <div id="portfolioRisks" style="padding:0 16px 14px;font-size:0.85rem;color:var(--muted);line-height:1.5"></div>
+      </div>
+
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-header"><span>Suggested adds</span></div>
+          <div id="portfolioSuggestions"><div class="loading">Score holdings vs market…</div></div>
+        </div>
+        <div class="card">
+          <div class="card-header"><span>Current holdings</span></div>
+          <div id="portfolioHoldings"><div class="loading">Loading…</div></div>
         </div>
       </div>
     </div>
@@ -453,6 +482,7 @@
       document.querySelectorAll(".tab").forEach(t => t.classList.toggle("active", t.dataset.tab === name));
       document.querySelectorAll(".panel").forEach(p => p.classList.toggle("active", p.id === `panel-${name}`));
       if (name === "alerts") { unreadAlerts = 0; updateAlertCount(); }
+      if (name === "portfolio") loadPortfolio();
     }
 
     function updateAlertCount() {
@@ -631,6 +661,67 @@
         status.textContent = "Error — tap Scan Now to retry";
       } finally {
         btn.disabled = false;
+      }
+    }
+
+    function fmtPct(v) {
+      if (v == null || Number.isNaN(v)) return "—";
+      return `${v >= 0 ? "+" : ""}${v.toFixed(1)}%`;
+    }
+
+    function renderSuggestions(items) {
+      if (!items.length) return '<div class="empty">No constructive diversifiers scored above threshold.</div>';
+      return items.map(s => `
+        <div class="alert-item medium">
+          <div class="alert-top">
+            <span class="alert-symbol">${s.symbol}</span>
+            <span class="alert-session">${s.theme} · score ${s.add_score}</span>
+          </div>
+          <div class="alert-msg">${s.rationale}</div>
+          <div class="alert-time">
+            $${s.price.toFixed(2)} · 1M ${fmtPct(s.ret_1m)} · 3M ${fmtPct(s.ret_3m)} · RSI ${s.rsi} · ATR ${s.atr_pct}%
+          </div>
+        </div>`).join("");
+    }
+
+    function renderHoldings(items) {
+      if (!items.length) return '<div class="empty">No holdings.</div>';
+      const rows = items.map(h => `
+        <tr>
+          <td class="symbol">${h.symbol}</td>
+          <td>${h.weight_pct.toFixed(1)}%</td>
+          <td class="${pctClass(h.ret_1m || 0)}">${fmtPct(h.ret_1m)}</td>
+          <td class="hide-mobile">${h.rsi.toFixed(0)}</td>
+          <td>${h.trend_score.toFixed(0)}</td>
+        </tr>`).join("");
+      return `<table><thead><tr>
+        <th>Symbol</th><th>Weight</th><th>1M</th>
+        <th class="hide-mobile">RSI</th><th>Trend</th>
+      </tr></thead><tbody>${rows}</tbody></table>
+      <div style="padding:10px 12px;font-size:0.78rem;color:var(--muted)">${
+        items.filter(h => h.note && h.note !== "neutral").map(h => `<div><strong>${h.symbol}</strong>: ${h.note}</div>`).join("")
+      }</div>`;
+    }
+
+    async function loadPortfolio() {
+      const sug = document.getElementById("portfolioSuggestions");
+      const hold = document.getElementById("portfolioHoldings");
+      sug.innerHTML = '<div class="loading">Analyzing market & book…</div>';
+      hold.innerHTML = '<div class="loading">Loading…</div>';
+      try {
+        const data = await fetchWithRetry("/api/portfolio/suggest?limit=6");
+        document.getElementById("pfValue").textContent = `$${data.total_value.toLocaleString()}`;
+        document.getElementById("pfSemi").textContent = `${(data.theme_weights.semiconductor || 0).toFixed(0)}%`;
+        document.getElementById("pfSpace").textContent = `${(data.theme_weights.space || 0).toFixed(0)}%`;
+        document.getElementById("pfRisks").textContent = `${(data.risks || []).length}`;
+        document.getElementById("portfolioRisks").innerHTML =
+          (data.risks || []).map(r => `• ${r}`).join("<br>") +
+          ((data.actions || []).length ? `<br><br>${data.actions.map(a => `→ ${a}`).join("<br>")}` : "");
+        sug.innerHTML = renderSuggestions(data.suggestions || []);
+        hold.innerHTML = renderHoldings(data.holdings || []);
+      } catch (err) {
+        sug.innerHTML = `<div class="error">Portfolio analysis failed: ${err.message}</div>`;
+        hold.innerHTML = "";
       }
     }
 
