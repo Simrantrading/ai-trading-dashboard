@@ -63,10 +63,15 @@ TELEGRAM_CHAT_ID=your_chat_id
 |----------|-------------|
 | `GET /api/session` | Current market session + thresholds |
 | `GET /api/rockets` | Run a scan (session-aware) |
+| `GET /api/portfolio/suggest` | Analyze Prime Account snapshot + ranked add suggestions |
 | `GET /api/alerts` | Alert history |
 | `POST /api/alerts/scan` | Manually trigger scan + fire alerts |
 | `GET /api/alerts/stream` | SSE real-time alert stream |
 | `GET /api/scheduler/status` | Background scheduler status |
+
+### Portfolio add suggestions
+
+`GET /api/portfolio/suggest?limit=5` scores the default Prime Account book (SOXL-heavy semiconductors + space names) for concentration risk, then ranks unlevered candidates by trend, RSI, ATR%, and diversification. Open the **Portfolio** tab in the UI.
 
 ## Rocket Score
 
